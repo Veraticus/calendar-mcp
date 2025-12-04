@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-An MCP (Model Context Protocol) server that provides a unified orchestration layer for managing multiple email and calendar accounts across Microsoft 365 (multiple tenants), Outlook.com, and Google Workspace. This MCP server can be consumed by any AI assistant (Claude, ChatGPT, GitHub Copilot, etc.) and internally orchestrates existing Microsoft and Google MCP servers with intelligent routing and cross-platform workflow capabilities.
+An MCP (Model Context Protocol) server that provides a unified read and query interface for multiple email and calendar accounts across Microsoft 365 (multiple tenants), Outlook.com, and Google Workspace. This enables AI assistants (Claude Desktop, ChatGPT, GitHub Copilot, etc.) to access all your accounts simultaneously for tasks like summarizing emails across all inboxes, viewing consolidated calendar schedules, and finding available meeting times across all calendars.
 
 ## Problem Statement
 
@@ -44,14 +44,16 @@ graph TD
 ### Core Components
 
 #### 1. MCP Server Interface (ModelContextProtocol Package)
-- **Exposes MCP tools** to AI assistants for unified email/calendar operations
-- **Tools include**:
-  - `send_email` - Send email from appropriate account
-  - `list_calendars` - List all calendars across accounts
-  - `create_event` - Create calendar event in appropriate account
-  - `search_emails` - Search emails across all accounts
-  - `forward_email` - Forward email between accounts/platforms
-  - `sync_calendar_event` - Sync events between calendars
+- **Exposes MCP tools** to AI assistants for unified email/calendar queries
+- **Core Tools**:
+  - `get_unread_emails` - Get all unread emails across all accounts
+  - `search_emails` - Search emails across all accounts with filters
+  - `get_email_details` - Get full email content from specific account
+  - `list_calendars` - List all calendars from all accounts
+  - `get_calendar_events` - Get events for date range across all calendars
+  - `find_available_times` - Find free time slots across all calendars
+  - `send_email` - Send email from appropriate account (requires routing)
+  - `create_event` - Create calendar event in appropriate calendar (requires routing)
 - **Transport**: Supports stdio, SSE, and WebSocket transports
 - **Configuration**: Account setup and router configuration via MCP resources
 
@@ -87,13 +89,14 @@ graph TD
   - Multi-account OAuth support
 
 #### 5. Workflow Engine
-- Cross-platform operations
+- Aggregates data from multiple accounts
 - Examples:
-  - "Forward this M365 email to my Gmail"
-  - "Sync this Google Calendar event to my work M365 calendar"
-  - "Find all meetings this week across all accounts"
-- Orchestrates multiple MCP server calls
-- Transaction coordination across platforms
+  - "Summarize all my unread emails from the last 24 hours"
+  - "Show me my calendar for tomorrow across all accounts"
+  - "Find 1-hour slots next week where I'm free across all calendars"
+  - "What emails do I have about the Acme project?"
+- Orchestrates multiple MCP server calls in parallel
+- Merges and deduplicates results from different sources
 
 #### 6. OpenTelemetry Integration
 - **Structured Logging**: Consistent log formatting across all components
@@ -294,25 +297,25 @@ For users choosing local Ollama models, recommended options:
 
 ### Phase 1 - Core Functionality
 1. Multi-account authentication and management
-2. Configurable AI-powered smart routing
-3. Basic email operations across all accounts
-4. Basic calendar operations across all accounts
-5. Unified account view
-6. OpenTelemetry instrumentation for observability
+2. Read-only email queries (unread, search, details)
+3. Read-only calendar queries (events, availability)
+4. Unified view aggregation across all accounts
+5. OpenTelemetry instrumentation for observability
 
-### Phase 2 - Advanced Workflows
-1. Cross-platform operations (forward, sync, copy)
-2. Intelligent scheduling across calendars
-3. Email threading and conversation management
-4. Contact synchronization
-5. Search across all accounts
+### Phase 2 - Write Operations
+1. Send email from appropriate account (with smart routing)
+2. Create calendar events in appropriate calendar (with smart routing)
+3. Email threading and conversation tracking
+4. Advanced search with filters and date ranges
 
-### Phase 3 - Intelligence Layer
-1. Learning from user routing preferences
-2. Automatic categorization and filing
-3. Smart suggestions for meeting times
-4. Conflict detection across calendars
-5. Priority-based inbox management
+### Phase 3 - AI-Assisted Scheduling
+1. Intelligent meeting time suggestions across calendars
+2. Automated meeting coordination via email
+   - Find times that work for you
+   - Email participants to find times that work for them
+   - Propose optimal meeting times
+3. Conflict detection and resolution
+4. Meeting preparation summaries
 
 ## Technical Stack
 
@@ -381,10 +384,10 @@ MIT or Apache 2.0 - permissive to encourage adoption
 
 ## Future Enhancements
 
-- Mobile app integration
-- Slack/Teams notification integration
-- Advanced analytics and reporting
+- Advanced email analytics and insights
+- Email importance scoring and prioritization
 - Calendar optimization suggestions
-- Email template management
-- Meeting scheduling assistant
+- Meeting preparation assistant (gather related emails/docs)
+- Time zone management for distributed teams
 - Integration with additional platforms (iCloud, Exchange on-premises)
+- Contact aggregation across platforms
