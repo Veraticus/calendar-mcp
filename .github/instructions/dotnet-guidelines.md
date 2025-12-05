@@ -1,5 +1,9 @@
 # .NET Development Guidelines
 
+## .NET Version
+
+- Use .NET 10 for all new projects unless there is a specific requirement to use an older version
+
 ## Async Programming
 
 - Prefer `async Task` over `void` for methods that perform any asynchronous operations
@@ -23,3 +27,25 @@
 - Include relevant context in log messages using structured logging parameters
 - Use appropriate log levels (Trace, Debug, Information, Warning, Error, Critical)
 - Instrument critical paths with OpenTelemetry spans for performance monitoring
+
+## Console Applications
+
+- Use Spectre.Console for building rich console applications with enhanced UI components
+- Leverage Spectre.Console's features like tables, progress bars, and prompts for better user experience
+- Follow best practices for console application design, including clear input/output handling and error reporting
+
+## Error Handling
+
+- Use try-catch blocks to handle exceptions gracefully
+- Log exceptions with sufficient context for troubleshooting
+- Avoid catching general exceptions; catch specific exception types where possible
+- Use custom exception types for domain-specific errors
+- Ensure proper resource cleanup in finally blocks or by using `using` statements
+
+## Configuration Management
+
+- Use `IConfiguration` for managing application settings
+- Never hardcode configuration values; use environment variables or dotnet user secrets for sensitive data
+- Structure configuration files (appsettings.json) for clarity and maintainability
+- Use options pattern (`IOptions<T>`) for strongly typed configuration access
+- Validate configuration settings at application startup

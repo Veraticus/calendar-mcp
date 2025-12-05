@@ -127,6 +127,76 @@ Comprehensive observability across all components:
 
 See [Telemetry](telemetry.md) for configuration and key metrics.
 
+## Project Structure
+
+The implementation follows a multi-head architecture to support different MCP transport mechanisms:
+
+### Multiple "Heads" (Host Applications)
+
+MCP servers can be exposed via different transports, requiring separate host applications:
+
+1. **MCP Server Console Application (stdio transport)**
+   - Primary transport for desktop AI assistants (Claude Desktop, etc.)
+   - Communicates via standard input/output
+   - Lightweight, direct process communication
+
+2. **ASP.NET Core Application (HTTP/SSE transport)**
+   - Web-based transport for browser-based AI assistants
+   - Server-Sent Events (SSE) for streaming responses
+   - HTTP endpoints for MCP protocol
+
+3. **Account Setup Console Application**
+   - Interactive tool for user account configuration and authentication
+   - Guides users through OAuth setup for each provider
+   - Initializes and validates token storage per account
+   - Tests connectivity and permissions
+   - Can be run independently before using the MCP server
+   - Useful for troubleshooting authentication issues
+
+4. **Future Transports**
+   - WebSocket support could be added as another head
+   - Each transport requires its own host application
+
+### Core Class Library
+
+All business logic, services, and MCP tool implementations reside in a **shared class library**:
+
+- **CalendarMcp.Core** (or similar naming)
+  - MCP tool implementations
+  - Provider services (M365, Google, Outlook.com)
+  - Account registry and configuration
+  - Smart router with LLM integration
+  - Credential manager
+  - Workflow engine
+  - Unified data models and interfaces
+  - OpenTelemetry integration
+
+### Project References
+
+```
+CalendarMcp.Server.csproj (Console - stdio transport)
+  └─> References: CalendarMcp.Core.csproj
+  └─> Contains: Program.cs (stdio transport setup)
+
+CalendarMcp.Web.csproj (ASP.NET Core - HTTP/SSE transport)
+  └─> References: CalendarMcp.Core.csproj
+  └─> Contains: Program.cs (HTTP/SSE transport setup)
+
+CalendarMcp.Setup.csproj (Console - account setup)
+  └─> References: CalendarMcp.Core.csproj
+  └─> Contains: Interactive authentication and configuration tool
+
+CalendarMcp.Core.csproj (Class Library)
+  └─> Contains: All business logic and services
+  └─> No transport-specific code
+```
+
+This architecture ensures:
+- **Code reuse**: All functionality implemented once in the core library
+- **Transport flexibility**: Easy to add new transports without duplicating logic
+- **Clean separation**: Transport concerns separated from business logic
+- **Testability**: Core library can be tested independently of transport mechanisms
+
 ## Technical Stack
 
 - **Language**: C# / .NET 9+ (target .NET 10 when available)
