@@ -66,6 +66,30 @@
               platforms = platforms.all;
             };
           };
+
+          # HTTP Server with OAuth support
+          http = pkgs.buildDotnetModule {
+            pname = "calendar-mcp-http";
+            inherit version;
+
+            src = ./src;
+
+            projectFile = "CalendarMcp.HttpServer/CalendarMcp.HttpServer.csproj";
+            executables = [ "CalendarMcp.HttpServer" ];
+
+            dotnet-sdk = dotnetSdk;
+            dotnet-runtime = dotnetRuntime;
+
+            nugetDeps = ./deps-http.json;
+            runtimeDeps = [ pkgs.icu ];
+
+            meta = with pkgs.lib; {
+              description = "HTTP MCP server for unified email and calendar access";
+              homepage = "https://github.com/Veraticus/calendar-mcp";
+              license = licenses.mit;
+              platforms = platforms.all;
+            };
+          };
         };
 
         devShells.default = pkgs.mkShell {
@@ -93,8 +117,26 @@
 
             package = lib.mkOption {
               type = lib.types.package;
-              default = self.packages.${pkgs.system}.default;
+              default = self.packages.${pkgs.system}.http;
               description = "The calendar-mcp package to use";
+            };
+
+            transport = lib.mkOption {
+              type = lib.types.enum [ "stdio" "http" ];
+              default = "http";
+              description = "Transport mode (stdio or http)";
+            };
+
+            host = lib.mkOption {
+              type = lib.types.str;
+              default = "127.0.0.1";
+              description = "HTTP server bind address";
+            };
+
+            port = lib.mkOption {
+              type = lib.types.port;
+              default = 8000;
+              description = "HTTP server port";
             };
 
             dataDir = lib.mkOption {
@@ -114,6 +156,25 @@
               default = "calendar-mcp";
               description = "Group to run calendar-mcp as";
             };
+
+            # OAuth configuration
+            accessClientIdFile = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = "Path to file containing ACCESS_CLIENT_ID";
+            };
+
+            accessClientSecretFile = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = "Path to file containing ACCESS_CLIENT_SECRET";
+            };
+
+            accessConfigUrl = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "OIDC discovery URL for Cloudflare Access";
+            };
           };
 
           config = lib.mkIf cfg.enable {
@@ -131,11 +192,18 @@
               wantedBy = [ "multi-user.target" ];
               after = [ "network.target" ];
 
+              environment = {
+                HOME = cfg.dataDir;
+                XDG_DATA_HOME = "${cfg.dataDir}/.local/share";
+                CALENDAR_MCP_CONFIG = "${cfg.dataDir}/.local/share/CalendarMcp";
+                MCP_SERVER_HOST = cfg.host;
+                MCP_SERVER_PORT = toString cfg.port;
+              };
+
               serviceConfig = {
                 Type = "simple";
                 User = cfg.user;
                 Group = cfg.group;
-                ExecStart = "${cfg.package}/bin/CalendarMcp.StdioServer";
                 Restart = "on-failure";
                 RestartSec = 5;
 
@@ -145,12 +213,25 @@
                 ProtectHome = true;
                 PrivateTmp = true;
                 ReadWritePaths = [ cfg.dataDir ];
+              } // lib.optionalAttrs (cfg.accessClientIdFile != null) {
+                LoadCredential = [
+                  "access-client-id:${cfg.accessClientIdFile}"
+                  "access-client-secret:${cfg.accessClientSecretFile}"
+                ];
               };
 
-              environment = {
-                HOME = cfg.dataDir;
-                XDG_DATA_HOME = "${cfg.dataDir}/.local/share";
-              };
+              script = let
+                exe = if cfg.transport == "http"
+                  then "${cfg.package}/bin/CalendarMcp.HttpServer"
+                  else "${self.packages.${pkgs.system}.default}/bin/CalendarMcp.StdioServer";
+              in ''
+                ${lib.optionalString (cfg.accessClientIdFile != null) ''
+                  export ACCESS_CLIENT_ID=$(cat $CREDENTIALS_DIRECTORY/access-client-id)
+                  export ACCESS_CLIENT_SECRET=$(cat $CREDENTIALS_DIRECTORY/access-client-secret)
+                  export ACCESS_CONFIG_URL="${cfg.accessConfigUrl}"
+                ''}
+                exec ${exe}
+              '';
             };
           };
         };

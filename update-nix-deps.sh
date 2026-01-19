@@ -14,6 +14,10 @@ echo "Updating CLI deps..."
 cli_script=$(nix build .#cli.fetch-deps --no-link --print-out-paths)
 "$cli_script" deps-cli.json
 
+echo "Updating HTTP server deps..."
+http_script=$(nix build .#http.fetch-deps --no-link --print-out-paths)
+"$http_script" deps-http.json
+
 echo ""
 echo "Done. Remember to stage the updated files:"
-echo "  git add deps-server.json deps-cli.json"
+echo "  git add deps-server.json deps-cli.json deps-http.json"
