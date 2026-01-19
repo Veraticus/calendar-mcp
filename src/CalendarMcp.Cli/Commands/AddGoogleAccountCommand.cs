@@ -19,6 +19,10 @@ public class AddGoogleAccountCommand : AsyncCommand<AddGoogleAccountCommand.Sett
         [Description("Path to appsettings.json (default: %LOCALAPPDATA%/CalendarMcp/appsettings.json)")]
         [CommandOption("--config")]
         public string? ConfigPath { get; init; }
+
+        [Description("Use device code flow for headless authentication (no browser required)")]
+        [CommandOption("--device-code")]
+        public bool DeviceCode { get; init; }
     }
 
     public AddGoogleAccountCommand(IGoogleAuthenticationService authService)
@@ -110,21 +114,53 @@ public class AddGoogleAccountCommand : AsyncCommand<AddGoogleAccountCommand.Sett
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Starting authentication...[/]");
-        AnsiConsole.MarkupLine("[dim]A browser window will open. Please sign in with your Google account.[/]");
+        if (!settings.DeviceCode)
+        {
+            AnsiConsole.MarkupLine("[dim]A browser window will open. Please sign in with your Google account.[/]");
+        }
         AnsiConsole.WriteLine();
 
         try
         {
-            // Authenticate
-            var success = await AnsiConsole.Status()
-                .StartAsync("Authenticating...", async ctx =>
-                {
-                    return await _authService.AuthenticateInteractiveAsync(
-                        clientId,
-                        clientSecret,
-                        scopes,
-                        accountId);
-                });
+            bool success;
+
+            if (settings.DeviceCode)
+            {
+                // Device code flow for headless environments
+                AnsiConsole.MarkupLine("[yellow]Using device code flow (headless mode)[/]");
+                AnsiConsole.WriteLine();
+
+                success = await _authService.AuthenticateWithDeviceCodeAsync(
+                    clientId,
+                    clientSecret,
+                    scopes,
+                    accountId,
+                    async (verificationUrl, userCode) =>
+                    {
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.Write(new Panel(
+                            $"[bold]1.[/] Visit: [link={verificationUrl}]{verificationUrl}[/]\n" +
+                            $"[bold]2.[/] Enter code: [bold green]{userCode}[/]")
+                            .Header("Authenticate in your browser")
+                            .BorderColor(Color.Blue));
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.MarkupLine("[dim]Waiting for authorization...[/]");
+                        await Task.CompletedTask;
+                    });
+            }
+            else
+            {
+                // Interactive flow (opens browser)
+                success = await AnsiConsole.Status()
+                    .StartAsync("Authenticating...", async ctx =>
+                    {
+                        return await _authService.AuthenticateInteractiveAsync(
+                            clientId,
+                            clientSecret,
+                            scopes,
+                            accountId);
+                    });
+            }
 
             if (!success)
             {
