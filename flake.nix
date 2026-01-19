@@ -13,6 +13,7 @@
 
         dotnetSdk = pkgs.dotnet-sdk_9;
         dotnetRuntime = pkgs.dotnet-runtime_9;
+        dotnetAspnetcore = pkgs.dotnet-aspnetcore_9;
 
         projectName = "CalendarMcp";
         version = "0.1.0";
@@ -78,7 +79,7 @@
             executables = [ "CalendarMcp.HttpServer" ];
 
             dotnet-sdk = dotnetSdk;
-            dotnet-runtime = dotnetRuntime;
+            dotnet-runtime = dotnetAspnetcore;
 
             nugetDeps = ./deps-http.json;
             runtimeDeps = [ pkgs.icu ];
