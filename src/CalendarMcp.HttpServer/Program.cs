@@ -86,7 +86,7 @@ public class Program
             }
             else
             {
-                Log.Information("OAuth authentication disabled - running in dev mode");
+                Log.Warning("OAuth authentication disabled - running in DEVELOPMENT MODE (no authentication)");
             }
 
             // Add MCP server with HTTP transport

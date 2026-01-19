@@ -103,8 +103,8 @@
             echo "Calendar MCP development shell"
             echo "  dotnet version: $(dotnet --version)"
             echo ""
-            echo "To regenerate deps.json:"
-            echo "  cd src && dotnet restore && nuget-to-json . > ../deps.json"
+            echo "To regenerate NuGet dependency files:"
+            echo "  ./update-nix-deps.sh"
           '';
         };
       }
