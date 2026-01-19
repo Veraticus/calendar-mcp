@@ -2,6 +2,7 @@ using CalendarMcp.Core.Providers;
 using CalendarMcp.Core.Services;
 using CalendarMcp.Core.Tools;
 using Microsoft.Extensions.DependencyInjection;
+using ModelContextProtocol.Server;
 
 namespace CalendarMcp.Core.Configuration;
 
@@ -18,16 +19,16 @@ public static class ServiceCollectionExtensions
         // Register authentication services
         services.AddSingleton<IM365AuthenticationService, M365AuthenticationService>();
         services.AddSingleton<IGoogleAuthenticationService, GoogleAuthenticationService>();
-        
+
         // Register provider services
         services.AddSingleton<IM365ProviderService, M365ProviderService>();
         services.AddSingleton<IGoogleProviderService, GoogleProviderService>();
         services.AddSingleton<IOutlookComProviderService, OutlookComProviderService>();
         services.AddSingleton<IProviderServiceFactory, ProviderServiceFactory>();
-        
+
         // Register account registry
         services.AddSingleton<IAccountRegistry, AccountRegistry>();
-        
+
         // Register MCP tools (method-based pattern - just register the classes)
         services.AddSingleton<ListAccountsTool>();
         services.AddSingleton<GetEmailsTool>();
@@ -36,7 +37,24 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GetCalendarEventsTool>();
         services.AddSingleton<SendEmailTool>();
         services.AddSingleton<CreateEventTool>();
-        
+
         return services;
+    }
+
+    /// <summary>
+    /// Registers all Calendar MCP tools with the MCP server builder.
+    /// Use this to ensure consistent tool registration across all server implementations.
+    /// </summary>
+    public static IMcpServerBuilder WithCalendarMcpTools(this IMcpServerBuilder builder)
+    {
+        return builder
+            .WithTools<ListAccountsTool>()
+            .WithTools<GetEmailsTool>()
+            .WithTools<SearchEmailsTool>()
+            .WithTools<GetContextualEmailSummaryTool>()
+            .WithTools<ListCalendarsTool>()
+            .WithTools<GetCalendarEventsTool>()
+            .WithTools<SendEmailTool>()
+            .WithTools<CreateEventTool>();
     }
 }

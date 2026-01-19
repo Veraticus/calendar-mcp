@@ -1,5 +1,4 @@
 using CalendarMcp.Core.Configuration;
-using CalendarMcp.Core.Tools;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Serilog;
 
@@ -93,16 +92,19 @@ public class Program
             // Add MCP server with HTTP transport
             builder.Services.AddMcpServer()
                 .WithHttpTransport()
-                .WithTools<ListAccountsTool>()
-                .WithTools<GetEmailsTool>()
-                .WithTools<SearchEmailsTool>()
-                .WithTools<GetContextualEmailSummaryTool>()
-                .WithTools<ListCalendarsTool>()
-                .WithTools<GetCalendarEventsTool>()
-                .WithTools<SendEmailTool>()
-                .WithTools<CreateEventTool>();
+                .WithCalendarMcpTools();
 
             var app = builder.Build();
+
+            // Health check endpoint (always accessible, no auth required)
+            app.MapGet("/health", () => Results.Ok(new
+            {
+                status = "healthy",
+                timestamp = DateTime.UtcNow,
+                version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"
+            }));
+
+            app.MapGet("/healthz", () => Results.Ok("ok")); // Simple liveness probe
 
             // Configure middleware
             if (authEnabled)
@@ -120,6 +122,15 @@ public class Program
             var host = Environment.GetEnvironmentVariable("MCP_SERVER_HOST") ?? "0.0.0.0";
             var port = Environment.GetEnvironmentVariable("MCP_SERVER_PORT") ?? "8000";
             var url = $"http://{host}:{port}";
+
+            // Set up graceful shutdown
+            var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+            lifetime.ApplicationStarted.Register(() =>
+                Log.Information("Calendar MCP HTTP server started on {Url}", url));
+            lifetime.ApplicationStopping.Register(() =>
+                Log.Information("Calendar MCP HTTP server is shutting down..."));
+            lifetime.ApplicationStopped.Register(() =>
+                Log.Information("Calendar MCP HTTP server stopped"));
 
             Log.Information("Starting Calendar MCP HTTP server on {Url}", url);
             app.Run(url);

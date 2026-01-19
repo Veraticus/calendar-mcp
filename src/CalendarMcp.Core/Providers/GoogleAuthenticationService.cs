@@ -193,7 +193,10 @@ public class GoogleAuthenticationService : IGoogleAuthenticationService
         {
             _logger.LogInformation("Starting device code authentication for account {AccountId}...", accountId);
 
-            using var httpClient = new HttpClient();
+            using var httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(30) // Prevent hanging on network issues
+            };
 
             // Step 1: Request device code
             var deviceCodeRequest = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -207,7 +210,26 @@ public class GoogleAuthenticationService : IGoogleAuthenticationService
                 deviceCodeRequest,
                 cancellationToken);
 
-            deviceCodeResponse.EnsureSuccessStatusCode();
+            if (!deviceCodeResponse.IsSuccessStatusCode)
+            {
+                var errorBody = await deviceCodeResponse.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError(
+                    "Device code request failed with status {StatusCode}: {ErrorBody}",
+                    deviceCodeResponse.StatusCode,
+                    errorBody);
+
+                // Provide user-friendly error messages for common failures
+                if (deviceCodeResponse.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    _logger.LogError("This may indicate an invalid client ID or misconfigured OAuth application");
+                }
+                else if (deviceCodeResponse.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    _logger.LogError("Rate limited by Google. Please wait before trying again");
+                }
+
+                return false;
+            }
 
             var deviceCode = await deviceCodeResponse.Content.ReadFromJsonAsync<DeviceCodeResponse>(cancellationToken: cancellationToken);
             if (deviceCode == null)
@@ -261,9 +283,23 @@ public class GoogleAuthenticationService : IGoogleAuthenticationService
                     continue;
                 }
 
+                if (token.Error == "access_denied")
+                {
+                    // User explicitly denied authorization
+                    _logger.LogWarning("Authorization denied by user for account {AccountId}", accountId);
+                    return false;
+                }
+
+                if (token.Error == "expired_token")
+                {
+                    // Device code expired before user authorized
+                    _logger.LogWarning("Device code expired before authorization for account {AccountId}", accountId);
+                    return false;
+                }
+
                 if (!string.IsNullOrEmpty(token.Error))
                 {
-                    _logger.LogError("Token request failed: {Error}", token.Error);
+                    _logger.LogError("Token request failed with error '{Error}' for account {AccountId}", token.Error, accountId);
                     return false;
                 }
 
@@ -271,7 +307,7 @@ public class GoogleAuthenticationService : IGoogleAuthenticationService
                 {
                     // Success! Save the token
                     await SaveTokenAsync(accountId, token, cancellationToken);
-                    _logger.LogInformation("Device code authentication successful for account {AccountId}", accountId);
+                    _logger.LogInformation("✓ Device code authentication successful for account {AccountId}", accountId);
                     return true;
                 }
             }
@@ -279,9 +315,19 @@ public class GoogleAuthenticationService : IGoogleAuthenticationService
             _logger.LogError("Device code expired for account {AccountId}", accountId);
             return false;
         }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            _logger.LogError("Network timeout during device code authentication for account {AccountId}", accountId);
+            throw;
+        }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Device code authentication cancelled for account {AccountId}", accountId);
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Network error during device code authentication for account {AccountId}: {Message}", accountId, ex.Message);
             throw;
         }
         catch (Exception ex)
