@@ -36,4 +36,22 @@ public interface IGoogleAuthenticationService
         string[] scopes,
         string accountId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Authenticate using device code flow (for headless/SSH scenarios)
+    /// </summary>
+    /// <param name="clientId">Google OAuth client ID</param>
+    /// <param name="clientSecret">Google OAuth client secret</param>
+    /// <param name="scopes">Required scopes</param>
+    /// <param name="accountId">Unique account identifier for token cache</param>
+    /// <param name="deviceCodeCallback">Callback to display device code info to user (verificationUrl, userCode)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if authentication was successful</returns>
+    Task<bool> AuthenticateWithDeviceCodeAsync(
+        string clientId,
+        string clientSecret,
+        string[] scopes,
+        string accountId,
+        Func<string, string, Task> deviceCodeCallback,
+        CancellationToken cancellationToken = default);
 }
