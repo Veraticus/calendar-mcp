@@ -19,6 +19,10 @@ public class AddM365AccountCommand : AsyncCommand<AddM365AccountCommand.Settings
         [Description("Path to appsettings.json (default: %LOCALAPPDATA%/CalendarMcp/appsettings.json)")]
         [CommandOption("--config")]
         public string? ConfigPath { get; init; }
+
+        [Description("Use device code flow for headless authentication (no browser required)")]
+        [CommandOption("--device-code")]
+        public bool DeviceCode { get; init; }
     }
 
     public AddM365AccountCommand(IM365AuthenticationService authService)
@@ -97,21 +101,51 @@ public class AddM365AccountCommand : AsyncCommand<AddM365AccountCommand.Settings
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Starting authentication...[/]");
-        AnsiConsole.MarkupLine("[dim]A browser window will open. Please sign in with your Microsoft 365 account.[/]");
+        if (!settings.DeviceCode)
+        {
+            AnsiConsole.MarkupLine("[dim]A browser window will open. Please sign in with your Microsoft 365 account.[/]");
+        }
         AnsiConsole.WriteLine();
 
         try
         {
-            // Authenticate
-            var token = await AnsiConsole.Status()
-                .StartAsync("Authenticating...", async ctx =>
-                {
-                    return await _authService.AuthenticateInteractiveAsync(
-                        tenantId,
-                        clientId,
-                        scopes,
-                        accountId);
-                });
+            string token;
+
+            if (settings.DeviceCode)
+            {
+                // Device code flow for headless environments
+                AnsiConsole.MarkupLine("[yellow]Using device code flow (headless mode)[/]");
+                AnsiConsole.WriteLine();
+
+                token = await _authService.AuthenticateWithDeviceCodeAsync(
+                    tenantId,
+                    clientId,
+                    scopes,
+                    accountId,
+                    async (message) =>
+                    {
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.Write(new Panel(message)
+                            .Header("Authenticate in your browser")
+                            .BorderColor(Color.Blue));
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.MarkupLine("[dim]Waiting for authorization...[/]");
+                        await Task.CompletedTask;
+                    });
+            }
+            else
+            {
+                // Interactive flow (opens browser)
+                token = await AnsiConsole.Status()
+                    .StartAsync("Authenticating...", async ctx =>
+                    {
+                        return await _authService.AuthenticateInteractiveAsync(
+                            tenantId,
+                            clientId,
+                            scopes,
+                            accountId);
+                    });
+            }
 
             AnsiConsole.MarkupLine("[green]✓ Authentication successful![/]");
             AnsiConsole.WriteLine();
